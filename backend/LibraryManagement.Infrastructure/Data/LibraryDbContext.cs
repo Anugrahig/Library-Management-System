@@ -11,6 +11,8 @@ public class LibraryDbContext(DbContextOptions<LibraryDbContext> options) : DbCo
 
     public DbSet<Book> Books => Set<Book>();
 
+    public DbSet<BookIssue> BookIssues => Set<BookIssue>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LibraryDbContext).Assembly);
