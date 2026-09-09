@@ -1,6 +1,8 @@
 using LibraryManagement.Domain.Entities;
 using LibraryManagement.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Xunit;
 
 namespace LibraryManagement.Tests.Books;
@@ -22,6 +24,8 @@ public class BookModelTests
         Assert.Equal(nameof(Book.BookId), entity.FindPrimaryKey()!.Properties.Single().Name);
         Assert.False(entity.FindProperty(nameof(Book.Title))!.IsNullable);
         Assert.Equal(250, entity.FindProperty(nameof(Book.Title))!.GetMaxLength());
+        Assert.False(entity.FindProperty(nameof(Book.Category))!.IsNullable);
+        Assert.Equal(50, entity.FindProperty(nameof(Book.Category))!.GetMaxLength());
         Assert.Equal(20, entity.FindProperty(nameof(Book.ISBN))!.GetMaxLength());
         Assert.Equal(200, entity.FindProperty(nameof(Book.Author))!.GetMaxLength());
         Assert.Equal("varchar(500)", entity.FindProperty(nameof(Book.CoverImage))!.GetColumnType());
@@ -29,6 +33,10 @@ public class BookModelTests
         Assert.Equal(0, entity.FindProperty(nameof(Book.TotalCopies))!.GetDefaultValue());
         Assert.Equal(0, entity.FindProperty(nameof(Book.AvailableCopies))!.GetDefaultValue());
         Assert.Equal(true, entity.FindProperty(nameof(Book.IsActive))!.GetDefaultValue());
+        var designEntity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(Book));
+
+        Assert.Contains(designEntity!.GetCheckConstraints(), constraint =>
+            constraint.Name == "CK_Books_Category");
         Assert.Contains(entity.GetIndexes(), index =>
             !index.IsUnique && index.Properties.Single().Name == nameof(Book.Title));
         Assert.Contains(entity.GetIndexes(), index =>

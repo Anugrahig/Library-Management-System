@@ -4,6 +4,7 @@ using LibraryManagement.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LibraryManagement.Infrastructure.Migrations
 {
     [DbContext(typeof(LibraryDbContext))]
-    partial class LibraryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260909043417_AddCategoryToBooks")]
+    partial class AddCategoryToBooks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -288,77 +291,6 @@ namespace LibraryManagement.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("LibraryManagement.Domain.Entities.Reservation", b =>
-                {
-                    b.Property<int>("ReservationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ReservationId"));
-
-                    b.Property<int>("BookId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("CancelledDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("SYSUTCDATETIME()");
-
-                    b.Property<DateTime>("ExpiryDate")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("DATEADD(DAY, 7, SYSUTCDATETIME())");
-
-                    b.Property<DateTime?>("FulfilledDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("MemberId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ReservationDate")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("SYSUTCDATETIME()");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasDefaultValue("Pending");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("ReservationId");
-
-                    b.HasIndex("BookId");
-
-                    b.HasIndex("ExpiryDate");
-
-                    b.HasIndex("MemberId");
-
-                    b.HasIndex("ReservationDate");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("BookId", "MemberId")
-                        .IsUnique()
-                        .HasFilter("[Status] = 'Pending'");
-
-                    b.ToTable("Reservations", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_Reservations_Dates", "[ExpiryDate] >= [ReservationDate] AND ([FulfilledDate] IS NULL OR [FulfilledDate] >= [ReservationDate]) AND ([CancelledDate] IS NULL OR [CancelledDate] >= [ReservationDate])");
-
-                            t.HasCheckConstraint("CK_Reservations_Lifecycle", "([Status] = 'Pending' AND [FulfilledDate] IS NULL AND [CancelledDate] IS NULL) OR ([Status] = 'Fulfilled' AND [FulfilledDate] IS NOT NULL AND [CancelledDate] IS NULL) OR ([Status] = 'Cancelled' AND [CancelledDate] IS NOT NULL AND [FulfilledDate] IS NULL) OR ([Status] = 'Expired' AND [FulfilledDate] IS NULL AND [CancelledDate] IS NULL)");
-
-                            t.HasCheckConstraint("CK_Reservations_Status", "[Status] IN ('Pending', 'Fulfilled', 'Cancelled', 'Expired')");
-                        });
-                });
-
             modelBuilder.Entity("LibraryManagement.Domain.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -473,25 +405,6 @@ namespace LibraryManagement.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("LibraryManagement.Domain.Entities.Reservation", b =>
-                {
-                    b.HasOne("LibraryManagement.Domain.Entities.Book", "Book")
-                        .WithMany()
-                        .HasForeignKey("BookId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("LibraryManagement.Domain.Entities.Member", "Member")
-                        .WithMany()
-                        .HasForeignKey("MemberId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Book");
-
-                    b.Navigation("Member");
                 });
 
             modelBuilder.Entity("LibraryManagement.Domain.Entities.User", b =>

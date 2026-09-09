@@ -1,9 +1,10 @@
+using LibraryManagement.Application.Interfaces.Repositories;
 using LibraryManagement.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace LibraryManagement.Infrastructure.Data;
 
-public class LibraryDbContext(DbContextOptions<LibraryDbContext> options) : DbContext(options)
+public class LibraryDbContext(DbContextOptions<LibraryDbContext> options) : DbContext(options), IUnitOfWork
 {
     public DbSet<User> Users => Set<User>();
 
@@ -12,6 +13,8 @@ public class LibraryDbContext(DbContextOptions<LibraryDbContext> options) : DbCo
     public DbSet<Book> Books => Set<Book>();
 
     public DbSet<BookIssue> BookIssues => Set<BookIssue>();
+
+    public DbSet<Reservation> Reservations => Set<Reservation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

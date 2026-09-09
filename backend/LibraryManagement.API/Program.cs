@@ -1,4 +1,6 @@
 using LibraryManagement.Infrastructure.Data;
+using LibraryManagement.Application;
+using LibraryManagement.Infrastructure;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +22,8 @@ if (string.IsNullOrWhiteSpace(connectionString))
 
 builder.Services.AddDbContext<LibraryDbContext>(options =>
     options.UseSqlServer(connectionString));
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure();
 
 var app = builder.Build();
 

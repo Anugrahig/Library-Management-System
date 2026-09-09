@@ -9,9 +9,15 @@ public class BookConfiguration : IEntityTypeConfiguration<Book>
     public void Configure(EntityTypeBuilder<Book> builder)
     {
         builder.ToTable("Books", tableBuilder =>
+        {
             tableBuilder.HasCheckConstraint(
                 "CK_Books_CopyCounts",
-                "[TotalCopies] >= 0 AND [AvailableCopies] >= 0 AND [AvailableCopies] <= [TotalCopies]"));
+                "[TotalCopies] >= 0 AND [AvailableCopies] >= 0 AND [AvailableCopies] <= [TotalCopies]");
+
+            tableBuilder.HasCheckConstraint(
+                "CK_Books_Category",
+                "[Category] IN ('Computer Science', 'Information Technology', 'Electronics & Communication', 'Mechanical Engineering', 'Civil Engineering', 'Mathematics', 'Physics', 'Chemistry', 'Business Administration', 'English Literature', 'General Reference', 'Fiction', 'Competitive Exam Preparation', 'Others')");
+        });
 
         builder.HasKey(book => book.BookId);
 
@@ -23,6 +29,10 @@ public class BookConfiguration : IEntityTypeConfiguration<Book>
 
         builder.Property(book => book.Title)
             .HasMaxLength(250)
+            .IsRequired();
+
+        builder.Property(book => book.Category)
+            .HasMaxLength(50)
             .IsRequired();
 
         builder.HasIndex(book => book.Title);
