@@ -209,6 +209,9 @@ internal sealed class FakeUserRepository(params User[] users) : IUserRepository
 
     public User? Added { get; private set; }
 
+    public Task<bool> HasAnyAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(_users.Count > 0);
+
     public Task<User?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_users.SingleOrDefault(user => user.Id == id));
 

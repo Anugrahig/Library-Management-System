@@ -8,6 +8,9 @@ namespace LibraryManagement.Infrastructure.Repositories;
 
 public sealed class EfUserRepository(LibraryDbContext context) : IUserRepository
 {
+    public Task<bool> HasAnyAsync(CancellationToken cancellationToken = default) =>
+        context.Users.AnyAsync(cancellationToken);
+
     public Task<User?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         context.Users.SingleOrDefaultAsync(user => user.Id == id, cancellationToken);
 

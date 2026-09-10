@@ -1,5 +1,6 @@
 using LibraryManagement.Application.DTOs.BookIssues;
 using LibraryManagement.Application.DTOs.Books;
+using LibraryManagement.Application.DTOs.Auth;
 using LibraryManagement.Application.DTOs.Members;
 using LibraryManagement.Application.DTOs.Reservations;
 using LibraryManagement.Application.DTOs.Users;
@@ -9,6 +10,13 @@ namespace LibraryManagement.Application.Interfaces.Services;
 public interface IUserService
 {
     Task<UserDto> CreateAsync(CreateUserRequest request, CancellationToken cancellationToken = default);
+}
+
+public interface IAuthService
+{
+    Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
+
+    Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default);
 }
 
 public interface IMemberService
