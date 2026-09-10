@@ -9,6 +9,5 @@ public class IssueBookRequestValidator : AbstractValidator<IssueBookRequest>
     {
         RuleFor(request => request.BookId).GreaterThan(0);
         RuleFor(request => request.MemberId).GreaterThan(0);
-        RuleFor(request => request.IssuedByUserId).GreaterThan(0);
     }
 }

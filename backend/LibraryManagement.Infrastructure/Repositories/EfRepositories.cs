@@ -29,6 +29,13 @@ public sealed class EfMemberRepository(LibraryDbContext context) : IMemberReposi
     public Task<Member?> GetByUserIdAsync(int userId, CancellationToken cancellationToken = default) =>
         context.Members.SingleOrDefaultAsync(member => member.UserId == userId, cancellationToken);
 
+    public async Task<IReadOnlyList<Member>> GetPendingAsync(CancellationToken cancellationToken = default) =>
+        await context.Members
+            .AsNoTracking()
+            .Where(member => !member.IsApproved)
+            .OrderBy(member => member.JoiningDate)
+            .ToListAsync(cancellationToken);
+
     public Task AddAsync(Member member, CancellationToken cancellationToken = default) =>
         context.Members.AddAsync(member, cancellationToken).AsTask();
 }
@@ -80,6 +87,11 @@ public sealed class EfBookIssueRepository(LibraryDbContext context) : IBookIssue
             issue => issue.BookId == bookId && issue.MemberId == memberId && issue.Status == BookIssueStatus.Issued,
             cancellationToken);
 
+    public Task<int> CountActiveForBookAsync(int bookId, CancellationToken cancellationToken = default) =>
+        context.BookIssues.CountAsync(
+            issue => issue.BookId == bookId && issue.Status == BookIssueStatus.Issued,
+            cancellationToken);
+
     public Task AddAsync(BookIssue issue, CancellationToken cancellationToken = default) =>
         context.BookIssues.AddAsync(issue, cancellationToken).AsTask();
 }
@@ -93,8 +105,15 @@ public sealed class EfReservationRepository(LibraryDbContext context) : IReserva
         context.Reservations.AnyAsync(
             reservation => reservation.BookId == bookId &&
                            reservation.MemberId == memberId &&
-                           reservation.Status == ReservationStatus.Pending,
+            reservation.Status == ReservationStatus.Pending,
             cancellationToken);
+
+    public async Task<IReadOnlyList<Reservation>> GetPendingExpiredAsync(
+        DateTime utcNow,
+        CancellationToken cancellationToken = default) =>
+        await context.Reservations
+            .Where(reservation => reservation.Status == ReservationStatus.Pending && reservation.ExpiryDate <= utcNow)
+            .ToListAsync(cancellationToken);
 
     public Task AddAsync(Reservation reservation, CancellationToken cancellationToken = default) =>
         context.Reservations.AddAsync(reservation, cancellationToken).AsTask();

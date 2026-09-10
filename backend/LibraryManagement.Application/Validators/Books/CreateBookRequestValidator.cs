@@ -52,11 +52,5 @@ public class CreateBookRequestValidator : AbstractValidator<CreateBookRequest>
         RuleFor(request => request.TotalCopies)
             .GreaterThanOrEqualTo(0);
 
-        RuleFor(request => request.AvailableCopies)
-            .GreaterThanOrEqualTo(0)
-            .LessThanOrEqualTo(request => request.TotalCopies);
-
-        RuleFor(request => request.AddedByUserId)
-            .GreaterThan(0);
     }
 }

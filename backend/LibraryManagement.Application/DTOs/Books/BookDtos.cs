@@ -18,16 +18,11 @@ public class CreateBookRequest
 
     public int TotalCopies { get; set; }
 
-    public int AvailableCopies { get; set; }
-
     public string? ShelfLocation { get; set; }
-
-    public int AddedByUserId { get; set; }
 }
 
 public class UpdateBookRequest : CreateBookRequest
 {
-    public bool IsActive { get; set; } = true;
 }
 
 public class BookSearchRequest

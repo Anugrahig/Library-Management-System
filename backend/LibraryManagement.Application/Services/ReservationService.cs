@@ -61,6 +61,23 @@ public class ReservationService(
     public Task<ReservationDto> FulfillAsync(ReservationActionRequest request, CancellationToken cancellationToken = default)
         => ChangeStatusAsync(request.ReservationId, ReservationStatus.Fulfilled, cancellationToken);
 
+    public async Task<int> ExpirePendingAsync(DateTime utcNow, CancellationToken cancellationToken = default)
+    {
+        var expiredReservations = await reservations.GetPendingExpiredAsync(utcNow, cancellationToken);
+        foreach (var reservation in expiredReservations)
+        {
+            reservation.Status = ReservationStatus.Expired;
+            reservation.UpdatedAt = utcNow;
+        }
+
+        if (expiredReservations.Count > 0)
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        return expiredReservations.Count;
+    }
+
     private async Task<ReservationDto> ChangeStatusAsync(int reservationId, ReservationStatus status, CancellationToken cancellationToken)
     {
         var reservation = await reservations.GetByIdAsync(reservationId, cancellationToken)

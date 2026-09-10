@@ -12,8 +12,7 @@ public class BookValidatorTests
         var request = new CreateBookRequest
         {
             Title = "Distributed Systems",
-            Category = "Unknown Category",
-            AddedByUserId = 1
+            Category = "Unknown Category"
         };
 
         var result = new CreateBookRequestValidator().Validate(request);

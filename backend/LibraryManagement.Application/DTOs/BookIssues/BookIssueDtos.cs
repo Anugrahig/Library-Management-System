@@ -5,20 +5,21 @@ public class IssueBookRequest
     public int BookId { get; set; }
 
     public int MemberId { get; set; }
-
-    public int IssuedByUserId { get; set; }
 }
 
 public class ReturnBookRequest
 {
     public int BookIssueId { get; set; }
 
-    public int ReturnedToUserId { get; set; }
-
     public decimal FineAmount { get; set; }
 }
 
 public class RenewBookRequest
+{
+    public int BookIssueId { get; set; }
+}
+
+public class PayFineRequest
 {
     public int BookIssueId { get; set; }
 }

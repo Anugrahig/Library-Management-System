@@ -19,6 +19,8 @@ public interface IMemberRepository
 
     Task<Member?> GetByUserIdAsync(int userId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Member>> GetPendingAsync(CancellationToken cancellationToken = default);
+
     Task AddAsync(Member member, CancellationToken cancellationToken = default);
 }
 
@@ -39,6 +41,8 @@ public interface IBookIssueRepository
 
     Task<bool> HasActiveIssueAsync(int bookId, int memberId, CancellationToken cancellationToken = default);
 
+    Task<int> CountActiveForBookAsync(int bookId, CancellationToken cancellationToken = default);
+
     Task AddAsync(BookIssue issue, CancellationToken cancellationToken = default);
 }
 
@@ -48,10 +52,16 @@ public interface IReservationRepository
 
     Task<bool> HasPendingAsync(int bookId, int memberId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Reservation>> GetPendingExpiredAsync(DateTime utcNow, CancellationToken cancellationToken = default);
+
     Task AddAsync(Reservation reservation, CancellationToken cancellationToken = default);
 }
 
 public interface IUnitOfWork
 {
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    Task<T> ExecuteInTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        CancellationToken cancellationToken = default);
 }

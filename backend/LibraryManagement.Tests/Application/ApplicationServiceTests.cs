@@ -37,9 +37,8 @@ public class ApplicationServiceTests
             new FakeUnitOfWork(),
             new CreateMemberRequestValidator());
 
-        var result = await service.CreateAsync(new CreateMemberRequest
+        var result = await service.CreateAsync(1, new CreateMemberRequest
         {
-            UserId = 1,
             JoiningDate = new DateTime(2026, 1, 1),
             RegistrationNumber = "202600000001",
             Course = "BTech CSE",
@@ -50,6 +49,54 @@ public class ApplicationServiceTests
         Assert.Equal(MembershipType.Student, result.MembershipType);
         Assert.Equal(5, result.MaxBooksAllowed);
         Assert.False(result.IsApproved);
+    }
+
+    [Fact]
+    public async Task Member_service_returns_member_for_user()
+    {
+        var member = new Member
+        {
+            Id = 4,
+            UserId = 1,
+            MembershipType = MembershipType.Student,
+            MaxBooksAllowed = 5,
+            IsApproved = false,
+            JoiningDate = new DateTime(2026, 1, 1)
+        };
+        var service = new MemberService(
+            new FakeUserRepository(),
+            new FakeMemberRepository(member),
+            new FakeUnitOfWork(),
+            new CreateMemberRequestValidator());
+
+        var result = await service.GetByUserIdAsync(1);
+
+        Assert.Equal(4, result.Id);
+        Assert.False(result.IsApproved);
+    }
+
+    [Fact]
+    public async Task Member_service_returns_pending_members()
+    {
+        var pending = new Member
+        {
+            Id = 4,
+            UserId = 1,
+            MembershipType = MembershipType.Student,
+            MaxBooksAllowed = 5,
+            IsApproved = false,
+            JoiningDate = new DateTime(2026, 1, 1)
+        };
+        var service = new MemberService(
+            new FakeUserRepository(),
+            new FakeMemberRepository(pending),
+            new FakeUnitOfWork(),
+            new CreateMemberRequestValidator());
+
+        var result = await service.GetPendingAsync();
+
+        var member = Assert.Single(result);
+        Assert.Equal(4, member.Id);
     }
 
     [Fact]
@@ -85,20 +132,73 @@ public class ApplicationServiceTests
             FullName = "Librarian",
             Role = UserRole.Librarian
         });
-        var service = new BookService(books, users, new FakeUnitOfWork(), new CreateBookRequestValidator());
+        var service = new BookService(books, users, new FakeBookIssueRepository(), new FakeUnitOfWork(), new CreateBookRequestValidator());
 
-        var result = await service.CreateAsync(new CreateBookRequest
+        var result = await service.CreateAsync(1, new CreateBookRequest
         {
             Title = "Clean Architecture",
             Category = "Computer Science",
             Author = "Robert Martin",
-            TotalCopies = 3,
-            AvailableCopies = 3,
-            AddedByUserId = 1
+            TotalCopies = 3
         });
 
         Assert.Equal("Clean Architecture", result.Title);
         Assert.Equal(3, books.Added!.TotalCopies);
+    }
+
+    [Fact]
+    public async Task Book_service_rejects_total_copies_below_issued_copies()
+    {
+        var book = new Book
+        {
+            BookId = 10,
+            Title = "Book",
+            Category = "Others",
+            TotalCopies = 5,
+            AvailableCopies = 2,
+            IsActive = true,
+            AddedByUserId = 1
+        };
+        var service = new BookService(
+            new FakeBookRepository(book),
+            new FakeUserRepository(),
+            new FakeBookIssueRepository(3),
+            new FakeUnitOfWork(),
+            new CreateBookRequestValidator());
+
+        await Assert.ThrowsAsync<LibraryManagement.Application.Common.Exceptions.BusinessRuleException>(() =>
+            service.UpdateAsync(10, new UpdateBookRequest
+            {
+                Title = "Book",
+                Category = "Others",
+                TotalCopies = 2
+            }));
+    }
+
+    [Fact]
+    public async Task Book_service_deactivates_book_without_deleting_it()
+    {
+        var book = new Book
+        {
+            BookId = 10,
+            Title = "Book",
+            Category = "Others",
+            TotalCopies = 1,
+            AvailableCopies = 1,
+            IsActive = true,
+            AddedByUserId = 1
+        };
+        var service = new BookService(
+            new FakeBookRepository(book),
+            new FakeUserRepository(),
+            new FakeBookIssueRepository(),
+            new FakeUnitOfWork(),
+            new CreateBookRequestValidator());
+
+        var result = await service.DeactivateAsync(10);
+
+        Assert.False(result.IsActive);
+        Assert.Same(book, new[] { book }.Single());
     }
 
     [Fact]
@@ -141,16 +241,61 @@ public class ApplicationServiceTests
             new FakeUnitOfWork(),
             new IssueBookRequestValidator());
 
-        var result = await service.IssueAsync(new IssueBookRequest
+        var result = await service.IssueAsync(1, new IssueBookRequest
         {
             BookId = 10,
-            MemberId = 20,
-            IssuedByUserId = 1
+            MemberId = 20
         });
 
         Assert.Equal(1, book.AvailableCopies);
         Assert.Equal(BookIssueStatus.Issued.ToString(), result.Status);
         Assert.Equal(14, (result.DueDate - result.IssueDate).Days);
+    }
+
+    [Fact]
+    public async Task Book_issue_service_marks_fine_as_paid_for_member_owner()
+    {
+        var issue = new BookIssue
+        {
+            BookIssueId = 30,
+            BookId = 10,
+            MemberId = 20,
+            Status = BookIssueStatus.Returned,
+            FineAmount = 25,
+            FinePaid = false,
+            IssueDate = new DateTime(2026, 1, 1),
+            DueDate = new DateTime(2026, 1, 15),
+            ReturnDate = new DateTime(2026, 1, 20),
+            IssuedByUserId = 1,
+            ReturnedToUserId = 1
+        };
+        var member = new Member
+        {
+            Id = 20,
+            UserId = 2,
+            MembershipType = MembershipType.Student,
+            MaxBooksAllowed = 5,
+            IsApproved = true
+        };
+        var service = new BookIssueService(
+            new FakeBookRepository(),
+            new FakeMemberRepository(member),
+            new FakeUserRepository(new User
+            {
+                Id = 2,
+                Email = "student@example.com",
+                PasswordHash = "hash",
+                FullName = "Student",
+                Role = UserRole.Student
+            }),
+            new FakeBookIssueRepository(0, issue),
+            new FakeUnitOfWork(),
+            new IssueBookRequestValidator());
+
+        var result = await service.PayFineAsync(2, new PayFineRequest { BookIssueId = 30 });
+
+        Assert.True(result.FinePaid);
+        Assert.NotNull(result.FinePaidDate);
     }
 
     [Fact]
@@ -189,11 +334,41 @@ public class ApplicationServiceTests
         Assert.Equal(ReservationStatus.Pending.ToString(), result.Status);
         Assert.Equal(7, (result.ExpiryDate - result.ReservationDate).Days);
     }
+
+    [Fact]
+    public async Task Reservation_service_expires_pending_reservations_past_expiry()
+    {
+        var reservation = new Reservation
+        {
+            ReservationId = 44,
+            BookId = 10,
+            MemberId = 20,
+            ReservationDate = DateTime.UtcNow.AddDays(-8),
+            ExpiryDate = DateTime.UtcNow.AddDays(-1),
+            Status = ReservationStatus.Pending
+        };
+        var repository = new FakeReservationRepository(reservation);
+        var service = new ReservationService(
+            new FakeBookRepository(),
+            new FakeMemberRepository(),
+            repository,
+            new FakeUnitOfWork(),
+            new CreateReservationRequestValidator());
+
+        var expired = await service.ExpirePendingAsync(DateTime.UtcNow);
+
+        Assert.Equal(1, expired);
+        Assert.Equal(ReservationStatus.Expired, reservation.Status);
+    }
 }
 
 internal sealed class FakeUnitOfWork : IUnitOfWork
 {
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
+
+    public Task<T> ExecuteInTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        CancellationToken cancellationToken = default) => operation(cancellationToken);
 }
 
 internal sealed class FakePasswordHasher : IPasswordHasher
@@ -237,6 +412,9 @@ internal sealed class FakeMemberRepository(params Member[] members) : IMemberRep
     public Task<Member?> GetByUserIdAsync(int userId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_members.SingleOrDefault(member => member.UserId == userId));
 
+    public Task<IReadOnlyList<Member>> GetPendingAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Member>>(_members.Where(member => !member.IsApproved).ToList());
+
     public Task AddAsync(Member member, CancellationToken cancellationToken = default)
     {
         member.Id = _members.Count + 1;
@@ -270,6 +448,14 @@ internal sealed class FakeBookIssueRepository : IBookIssueRepository
 {
     private readonly List<BookIssue> _issues = [];
 
+    private readonly int _activeBookCount;
+
+    public FakeBookIssueRepository(int activeBookCount = 0, params BookIssue[] issues)
+    {
+        _activeBookCount = activeBookCount;
+        _issues.AddRange(issues);
+    }
+
     public Task<BookIssue?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_issues.SingleOrDefault(issue => issue.BookIssueId == id));
 
@@ -278,6 +464,9 @@ internal sealed class FakeBookIssueRepository : IBookIssueRepository
 
     public Task<bool> HasActiveIssueAsync(int bookId, int memberId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_issues.Any(issue => issue.BookId == bookId && issue.MemberId == memberId && issue.Status == BookIssueStatus.Issued));
+
+    public Task<int> CountActiveForBookAsync(int bookId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_activeBookCount + _issues.Count(issue => issue.BookId == bookId && issue.Status == BookIssueStatus.Issued));
 
     public Task AddAsync(BookIssue issue, CancellationToken cancellationToken = default)
     {

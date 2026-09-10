@@ -28,11 +28,11 @@ public class MemberService(
 
     private static readonly string[] FacultyDepartments = ["CSE", "ECE", "EEE", "ME", "CE", "IT", "MBA", "MCA"];
 
-    public async Task<MemberDto> CreateAsync(CreateMemberRequest request, CancellationToken cancellationToken = default)
+    public async Task<MemberDto> CreateAsync(int userId, CreateMemberRequest request, CancellationToken cancellationToken = default)
     {
         await validator.ValidateAndThrowAsync(request, cancellationToken);
 
-        var user = await users.GetByIdAsync(request.UserId, cancellationToken)
+        var user = await users.GetByIdAsync(userId, cancellationToken)
             ?? throw new NotFoundException("The linked user was not found.");
 
         if (user.Role is not (UserRole.Student or UserRole.Faculty))
@@ -40,19 +40,33 @@ public class MemberService(
             throw new BusinessRuleException("Only Student and Faculty users can become members.");
         }
 
-        if (await members.GetByUserIdAsync(request.UserId, cancellationToken) is not null)
+        if (await members.GetByUserIdAsync(userId, cancellationToken) is not null)
         {
             throw new ConflictException("This user already has a member profile.");
         }
 
         var member = user.Role == UserRole.Student
-            ? BuildStudent(request)
-            : BuildFaculty(request);
+            ? BuildStudent(userId, request)
+            : BuildFaculty(userId, request);
 
         await members.AddAsync(member, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Map(member);
+    }
+
+    public async Task<MemberDto> GetByUserIdAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        var member = await members.GetByUserIdAsync(userId, cancellationToken)
+            ?? throw new NotFoundException("The member profile was not found.");
+
+        return Map(member);
+    }
+
+    public async Task<IReadOnlyList<MemberDto>> GetPendingAsync(CancellationToken cancellationToken = default)
+    {
+        var pendingMembers = await members.GetPendingAsync(cancellationToken);
+        return pendingMembers.Select(Map).ToList();
     }
 
     public async Task<MemberDto> ApproveAsync(int memberId, ApproveMemberRequest request, CancellationToken cancellationToken = default)
@@ -66,7 +80,7 @@ public class MemberService(
         return Map(member);
     }
 
-    private static Member BuildStudent(CreateMemberRequest request)
+    private static Member BuildStudent(int userId, CreateMemberRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.RegistrationNumber) ||
             string.IsNullOrWhiteSpace(request.Course) ||
@@ -83,7 +97,7 @@ public class MemberService(
 
         return new Member
         {
-            UserId = request.UserId,
+            UserId = userId,
             JoiningDate = request.JoiningDate.Date,
             MaxBooksAllowed = 5,
             MembershipType = MembershipType.Student,
@@ -95,7 +109,7 @@ public class MemberService(
         };
     }
 
-    private static Member BuildFaculty(CreateMemberRequest request)
+    private static Member BuildFaculty(int userId, CreateMemberRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.EmployeeId) ||
             string.IsNullOrWhiteSpace(request.Designation) ||
@@ -112,7 +126,7 @@ public class MemberService(
 
         return new Member
         {
-            UserId = request.UserId,
+            UserId = userId,
             JoiningDate = request.JoiningDate.Date,
             MaxBooksAllowed = 8,
             MembershipType = MembershipType.Faculty,

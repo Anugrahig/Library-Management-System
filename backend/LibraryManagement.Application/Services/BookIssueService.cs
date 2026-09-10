@@ -16,15 +16,16 @@ public class BookIssueService(
     IUnitOfWork unitOfWork,
     IValidator<IssueBookRequest> issueValidator) : IBookIssueService
 {
-    public async Task<BookIssueDto> IssueAsync(IssueBookRequest request, CancellationToken cancellationToken = default)
+    public Task<BookIssueDto> IssueAsync(int issuedByUserId, IssueBookRequest request, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
     {
-        await issueValidator.ValidateAndThrowAsync(request, cancellationToken);
+        await issueValidator.ValidateAndThrowAsync(request, transactionCancellationToken);
 
-        var book = await books.GetByIdAsync(request.BookId, cancellationToken)
+        var book = await books.GetByIdAsync(request.BookId, transactionCancellationToken)
             ?? throw new NotFoundException("The book was not found.");
-        var member = await members.GetByIdAsync(request.MemberId, cancellationToken)
+        var member = await members.GetByIdAsync(request.MemberId, transactionCancellationToken)
             ?? throw new NotFoundException("The member was not found.");
-        var issuingUser = await users.GetByIdAsync(request.IssuedByUserId, cancellationToken)
+        var issuingUser = await users.GetByIdAsync(issuedByUserId, transactionCancellationToken)
             ?? throw new NotFoundException("The issuing user was not found.");
 
         if (!book.IsActive || book.AvailableCopies <= 0)
@@ -42,12 +43,12 @@ public class BookIssueService(
             throw new BusinessRuleException("Only Admin or Librarian users can issue books.");
         }
 
-        if (await issues.CountActiveForMemberAsync(member.Id, cancellationToken) >= member.MaxBooksAllowed)
+        if (await issues.CountActiveForMemberAsync(member.Id, transactionCancellationToken) >= member.MaxBooksAllowed)
         {
             throw new BusinessRuleException("The member has reached the maximum allowed books.");
         }
 
-        if (await issues.HasActiveIssueAsync(book.BookId, member.Id, cancellationToken))
+        if (await issues.HasActiveIssueAsync(book.BookId, member.Id, transactionCancellationToken))
         {
             throw new ConflictException("The member already has this book issued.");
         }
@@ -66,19 +67,20 @@ public class BookIssueService(
         };
 
         book.AvailableCopies--;
-        await issues.AddAsync(issue, cancellationToken);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await issues.AddAsync(issue, transactionCancellationToken);
+        await unitOfWork.SaveChangesAsync(transactionCancellationToken);
 
         return Map(issue);
-    }
+    }, cancellationToken);
 
-    public async Task<BookIssueDto> ReturnAsync(ReturnBookRequest request, CancellationToken cancellationToken = default)
+    public Task<BookIssueDto> ReturnAsync(int returnedToUserId, ReturnBookRequest request, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
     {
-        var issue = await issues.GetByIdAsync(request.BookIssueId, cancellationToken)
+        var issue = await issues.GetByIdAsync(request.BookIssueId, transactionCancellationToken)
             ?? throw new NotFoundException("The book issue was not found.");
-        var book = await books.GetByIdAsync(issue.BookId, cancellationToken)
+        var book = await books.GetByIdAsync(issue.BookId, transactionCancellationToken)
             ?? throw new NotFoundException("The book was not found.");
-        var returningUser = await users.GetByIdAsync(request.ReturnedToUserId, cancellationToken)
+        var returningUser = await users.GetByIdAsync(returnedToUserId, transactionCancellationToken)
             ?? throw new NotFoundException("The returning user was not found.");
 
         if (returningUser.Role is not (UserRole.Admin or UserRole.Librarian))
@@ -104,13 +106,14 @@ public class BookIssueService(
         issue.FinePaidDate = null;
         book.AvailableCopies = Math.Min(book.TotalCopies, book.AvailableCopies + 1);
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await unitOfWork.SaveChangesAsync(transactionCancellationToken);
         return Map(issue);
-    }
+    }, cancellationToken);
 
-    public async Task<BookIssueDto> RenewAsync(RenewBookRequest request, CancellationToken cancellationToken = default)
+    public Task<BookIssueDto> RenewAsync(RenewBookRequest request, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
     {
-        var issue = await issues.GetByIdAsync(request.BookIssueId, cancellationToken)
+        var issue = await issues.GetByIdAsync(request.BookIssueId, transactionCancellationToken)
             ?? throw new NotFoundException("The book issue was not found.");
 
         if (issue.Status != BookIssueStatus.Issued)
@@ -125,10 +128,42 @@ public class BookIssueService(
 
         issue.RenewalCount++;
         issue.DueDate = issue.DueDate.AddDays(14);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await unitOfWork.SaveChangesAsync(transactionCancellationToken);
 
         return Map(issue);
-    }
+    }, cancellationToken);
+
+    public Task<BookIssueDto> PayFineAsync(int userId, PayFineRequest request, CancellationToken cancellationToken = default) =>
+        unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
+        {
+            var issue = await issues.GetByIdAsync(request.BookIssueId, transactionCancellationToken)
+                ?? throw new NotFoundException("The book issue was not found.");
+            var member = await members.GetByIdAsync(issue.MemberId, transactionCancellationToken)
+                ?? throw new NotFoundException("The member was not found.");
+            var user = await users.GetByIdAsync(userId, transactionCancellationToken)
+                ?? throw new NotFoundException("The user was not found.");
+
+            if (user.Role is not (UserRole.Admin or UserRole.Librarian) && member.UserId != userId)
+            {
+                throw new BusinessRuleException("You cannot pay another member's fine.");
+            }
+
+            if (issue.FineAmount <= 0)
+            {
+                throw new BusinessRuleException("This issue has no outstanding fine.");
+            }
+
+            if (issue.FinePaid)
+            {
+                throw new ConflictException("The fine has already been paid.");
+            }
+
+            issue.FinePaid = true;
+            issue.FinePaidDate = DateTime.UtcNow;
+            await unitOfWork.SaveChangesAsync(transactionCancellationToken);
+
+            return Map(issue);
+        }, cancellationToken);
 
     private static BookIssueDto Map(BookIssue issue) => new()
     {

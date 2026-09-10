@@ -7,9 +7,6 @@ public class CreateMemberRequestValidator : AbstractValidator<CreateMemberReques
 {
     public CreateMemberRequestValidator()
     {
-        RuleFor(request => request.UserId)
-            .GreaterThan(0);
-
         RuleFor(request => request.JoiningDate)
             .NotEmpty();
 

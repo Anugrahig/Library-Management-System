@@ -21,25 +21,35 @@ public interface IAuthService
 
 public interface IMemberService
 {
-    Task<MemberDto> CreateAsync(CreateMemberRequest request, CancellationToken cancellationToken = default);
+    Task<MemberDto> CreateAsync(int userId, CreateMemberRequest request, CancellationToken cancellationToken = default);
+
+    Task<MemberDto> GetByUserIdAsync(int userId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MemberDto>> GetPendingAsync(CancellationToken cancellationToken = default);
 
     Task<MemberDto> ApproveAsync(int memberId, ApproveMemberRequest request, CancellationToken cancellationToken = default);
 }
 
 public interface IBookService
 {
-    Task<BookDto> CreateAsync(CreateBookRequest request, CancellationToken cancellationToken = default);
+    Task<BookDto> CreateAsync(int addedByUserId, CreateBookRequest request, CancellationToken cancellationToken = default);
+
+    Task<BookDto> UpdateAsync(int bookId, UpdateBookRequest request, CancellationToken cancellationToken = default);
+
+    Task<BookDto> DeactivateAsync(int bookId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<BookDto>> SearchAsync(BookSearchRequest request, CancellationToken cancellationToken = default);
 }
 
 public interface IBookIssueService
 {
-    Task<BookIssueDto> IssueAsync(IssueBookRequest request, CancellationToken cancellationToken = default);
+    Task<BookIssueDto> IssueAsync(int issuedByUserId, IssueBookRequest request, CancellationToken cancellationToken = default);
 
-    Task<BookIssueDto> ReturnAsync(ReturnBookRequest request, CancellationToken cancellationToken = default);
+    Task<BookIssueDto> ReturnAsync(int returnedToUserId, ReturnBookRequest request, CancellationToken cancellationToken = default);
 
     Task<BookIssueDto> RenewAsync(RenewBookRequest request, CancellationToken cancellationToken = default);
+
+    Task<BookIssueDto> PayFineAsync(int userId, PayFineRequest request, CancellationToken cancellationToken = default);
 }
 
 public interface IReservationService
@@ -49,4 +59,6 @@ public interface IReservationService
     Task<ReservationDto> CancelAsync(ReservationActionRequest request, CancellationToken cancellationToken = default);
 
     Task<ReservationDto> FulfillAsync(ReservationActionRequest request, CancellationToken cancellationToken = default);
+
+    Task<int> ExpirePendingAsync(DateTime utcNow, CancellationToken cancellationToken = default);
 }

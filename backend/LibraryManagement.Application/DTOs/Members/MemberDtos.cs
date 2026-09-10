@@ -4,8 +4,6 @@ namespace LibraryManagement.Application.DTOs.Members;
 
 public class CreateMemberRequest
 {
-    public int UserId { get; set; }
-
     public DateTime JoiningDate { get; set; }
 
     public string? RegistrationNumber { get; set; }

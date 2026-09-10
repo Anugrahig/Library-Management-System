@@ -88,6 +88,7 @@ app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
         NotFoundException => StatusCodes.Status404NotFound,
         ConflictException => StatusCodes.Status409Conflict,
         BusinessRuleException => StatusCodes.Status400BadRequest,
+        UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
         _ => StatusCodes.Status500InternalServerError
     };
 
