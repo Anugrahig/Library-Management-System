@@ -1,4 +1,5 @@
 using LibraryManagement.Domain.Entities;
+using LibraryManagement.Domain.Enums;
 
 namespace LibraryManagement.Application.Interfaces.Repositories;
 
@@ -9,6 +10,10 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<User>> SearchAsync(UserRole? role, bool? isActive, string? searchTerm, CancellationToken cancellationToken = default);
+
+    Task<int> CountActiveAdminsAsync(CancellationToken cancellationToken = default);
 
     Task AddAsync(User user, CancellationToken cancellationToken = default);
 }

@@ -5,6 +5,7 @@ using LibraryManagement.Application.DTOs.Users;
 using LibraryManagement.Application.Interfaces.Repositories;
 using LibraryManagement.Application.Interfaces.Services;
 using LibraryManagement.Domain.Entities;
+using LibraryManagement.Domain.Enums;
 
 namespace LibraryManagement.Application.Services;
 
@@ -35,6 +36,65 @@ public class UserService(
         };
 
         await users.AddAsync(user, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Map(user);
+    }
+
+    public async Task<IReadOnlyList<UserDto>> GetAllAsync(UserSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        var userRecords = await users.SearchAsync(request.Role, request.IsActive, request.SearchTerm, cancellationToken);
+        return userRecords.Select(Map).ToList();
+    }
+
+    public async Task<UserDto> UpdateAsync(int userId, UpdateUserRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.FullName) || request.FullName.Length > 150)
+        {
+            throw new BusinessRuleException("Full name is required and must be at most 150 characters.");
+        }
+
+        var user = await users.GetByIdAsync(userId, cancellationToken)
+            ?? throw new NotFoundException("The user was not found.");
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var email = request.Email.Trim().ToLowerInvariant();
+            var existing = await users.GetByEmailAsync(email, cancellationToken);
+            if (existing is not null && existing.Id != userId)
+            {
+                throw new ConflictException("A user with this email already exists.");
+            }
+
+            user.Email = email;
+        }
+
+        if (user.Role == UserRole.Admin && request.Role != UserRole.Admin && await users.CountActiveAdminsAsync(cancellationToken) <= 1)
+        {
+            throw new BusinessRuleException("The last active Admin cannot be demoted.");
+        }
+
+        user.FullName = request.FullName.Trim();
+        user.MobileNumber = request.MobileNumber;
+        user.Role = request.Role;
+        user.UpdatedAt = DateTime.UtcNow;
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Map(user);
+    }
+
+    public async Task<UserDto> DeactivateAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        var user = await users.GetByIdAsync(userId, cancellationToken)
+            ?? throw new NotFoundException("The user was not found.");
+
+        if (user.Role == UserRole.Admin && await users.CountActiveAdminsAsync(cancellationToken) <= 1)
+        {
+            throw new BusinessRuleException("The last active Admin cannot be deactivated.");
+        }
+
+        user.IsActive = false;
+        user.UpdatedAt = DateTime.UtcNow;
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Map(user);

@@ -10,6 +10,12 @@ namespace LibraryManagement.Application.Interfaces.Services;
 public interface IUserService
 {
     Task<UserDto> CreateAsync(CreateUserRequest request, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<UserDto>> GetAllAsync(UserSearchRequest request, CancellationToken cancellationToken = default);
+
+    Task<UserDto> UpdateAsync(int userId, UpdateUserRequest request, CancellationToken cancellationToken = default);
+
+    Task<UserDto> DeactivateAsync(int userId, CancellationToken cancellationToken = default);
 }
 
 public interface IAuthService
@@ -54,9 +60,9 @@ public interface IBookIssueService
 
 public interface IReservationService
 {
-    Task<ReservationDto> CreateAsync(CreateReservationRequest request, CancellationToken cancellationToken = default);
+    Task<ReservationDto> CreateAsync(int userId, CreateReservationRequest request, CancellationToken cancellationToken = default);
 
-    Task<ReservationDto> CancelAsync(ReservationActionRequest request, CancellationToken cancellationToken = default);
+    Task<ReservationDto> CancelAsync(int userId, ReservationActionRequest request, CancellationToken cancellationToken = default);
 
     Task<ReservationDto> FulfillAsync(ReservationActionRequest request, CancellationToken cancellationToken = default);
 

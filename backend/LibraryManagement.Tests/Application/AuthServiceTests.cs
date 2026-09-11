@@ -69,9 +69,10 @@ public class AuthServiceTests
             Role = UserRole.Admin,
             IsActive = true
         };
+        var unitOfWork = new FakeUnitOfWork();
         var service = new AuthService(
             new FakeUserRepository(user),
-            new FakeUnitOfWork(),
+            unitOfWork,
             new FakePasswordHasher(),
             new FakeJwtTokenGenerator(),
             new LoginRequestValidator(),
@@ -86,6 +87,7 @@ public class AuthServiceTests
         Assert.Equal("token-7", result.AccessToken);
         Assert.Equal(7, result.User.Id);
         Assert.Equal(UserRole.Admin, result.User.Role);
+        Assert.True(unitOfWork.SaveChangesCalled);
     }
 }
 

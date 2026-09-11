@@ -8,6 +8,5 @@ public class CreateReservationRequestValidator : AbstractValidator<CreateReserva
     public CreateReservationRequestValidator()
     {
         RuleFor(request => request.BookId).GreaterThan(0);
-        RuleFor(request => request.MemberId).GreaterThan(0);
     }
 }

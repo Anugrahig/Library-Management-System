@@ -121,6 +121,62 @@ public class ApplicationServiceTests
     }
 
     [Fact]
+    public async Task User_service_lists_users_without_password_hashes()
+    {
+        var user = new User
+        {
+            Id = 7,
+            Email = "student@example.com",
+            PasswordHash = "secret-hash",
+            FullName = "Student User",
+            Role = UserRole.Student,
+            IsActive = true
+        };
+        var service = new UserService(
+            new FakeUserRepository(user),
+            new FakeUnitOfWork(),
+            new FakePasswordHasher(),
+            new CreateUserRequestValidator());
+
+        var result = await service.GetAllAsync(new UserSearchRequest());
+
+        var listed = Assert.Single(result);
+        Assert.Equal("student@example.com", listed.Email);
+        Assert.DoesNotContain("secret-hash", System.Text.Json.JsonSerializer.Serialize(listed));
+    }
+
+    [Fact]
+    public async Task User_service_updates_and_deactivates_user()
+    {
+        var user = new User
+        {
+            Id = 7,
+            Email = "student@example.com",
+            PasswordHash = "secret-hash",
+            FullName = "Old Name",
+            Role = UserRole.Student,
+            IsActive = true
+        };
+        var service = new UserService(
+            new FakeUserRepository(user),
+            new FakeUnitOfWork(),
+            new FakePasswordHasher(),
+            new CreateUserRequestValidator());
+
+        var updated = await service.UpdateAsync(7, new UpdateUserRequest
+        {
+            FullName = "Updated Name",
+            MobileNumber = "9876543210",
+            Role = UserRole.Faculty
+        });
+        var deactivated = await service.DeactivateAsync(7);
+
+        Assert.Equal("Updated Name", updated.FullName);
+        Assert.Equal(UserRole.Faculty, updated.Role);
+        Assert.False(deactivated.IsActive);
+    }
+
+    [Fact]
     public async Task Book_service_creates_book_with_requested_catalog_values()
     {
         var books = new FakeBookRepository();
@@ -321,14 +377,21 @@ public class ApplicationServiceTests
         var service = new ReservationService(
             new FakeBookRepository(book),
             new FakeMemberRepository(member),
+            new FakeUserRepository(new User
+            {
+                Id = 2,
+                Email = "student@example.com",
+                PasswordHash = "hash",
+                FullName = "Student",
+                Role = UserRole.Student
+            }),
             reservations,
             new FakeUnitOfWork(),
             new CreateReservationRequestValidator());
 
-        var result = await service.CreateAsync(new CreateReservationRequest
+        var result = await service.CreateAsync(2, new CreateReservationRequest
         {
-            BookId = 10,
-            MemberId = 20
+            BookId = 10
         });
 
         Assert.Equal(ReservationStatus.Pending.ToString(), result.Status);
@@ -351,6 +414,7 @@ public class ApplicationServiceTests
         var service = new ReservationService(
             new FakeBookRepository(),
             new FakeMemberRepository(),
+            new FakeUserRepository(),
             repository,
             new FakeUnitOfWork(),
             new CreateReservationRequestValidator());
@@ -364,7 +428,13 @@ public class ApplicationServiceTests
 
 internal sealed class FakeUnitOfWork : IUnitOfWork
 {
-    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
+    public bool SaveChangesCalled { get; private set; }
+
+    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCalled = true;
+        return Task.FromResult(1);
+    }
 
     public Task<T> ExecuteInTransactionAsync<T>(
         Func<CancellationToken, Task<T>> operation,
@@ -392,6 +462,16 @@ internal sealed class FakeUserRepository(params User[] users) : IUserRepository
 
     public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         Task.FromResult(_users.SingleOrDefault(user => user.Email == email));
+
+    public Task<IReadOnlyList<User>> SearchAsync(UserRole? role, bool? isActive, string? searchTerm, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<User>>(_users
+            .Where(user => (!role.HasValue || user.Role == role.Value) &&
+                          (!isActive.HasValue || user.IsActive == isActive.Value) &&
+                          (string.IsNullOrWhiteSpace(searchTerm) || user.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || user.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
+            .ToList());
+
+    public Task<int> CountActiveAdminsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(_users.Count(user => user.Role == UserRole.Admin && user.IsActive));
 
     public Task AddAsync(User user, CancellationToken cancellationToken = default)
     {
@@ -478,13 +558,23 @@ internal sealed class FakeBookIssueRepository : IBookIssueRepository
 
 internal sealed class FakeReservationRepository : IReservationRepository
 {
-    private readonly List<Reservation> _reservations = [];
+    private readonly List<Reservation> _reservations;
+
+    public FakeReservationRepository(params Reservation[] reservations)
+    {
+        _reservations = reservations.ToList();
+    }
 
     public Task<Reservation?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_reservations.SingleOrDefault(reservation => reservation.ReservationId == id));
 
     public Task<bool> HasPendingAsync(int bookId, int memberId, CancellationToken cancellationToken = default) =>
         Task.FromResult(_reservations.Any(reservation => reservation.BookId == bookId && reservation.MemberId == memberId && reservation.Status == ReservationStatus.Pending));
+
+    public Task<IReadOnlyList<Reservation>> GetPendingExpiredAsync(DateTime utcNow, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Reservation>>(_reservations
+            .Where(reservation => reservation.Status == ReservationStatus.Pending && reservation.ExpiryDate <= utcNow)
+            .ToList());
 
     public Task AddAsync(Reservation reservation, CancellationToken cancellationToken = default)
     {

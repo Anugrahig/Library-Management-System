@@ -35,3 +35,23 @@ public class UserDto
 
     public DateTime? LastLoginAt { get; set; }
 }
+
+public class UserSearchRequest
+{
+    public string? SearchTerm { get; set; }
+
+    public UserRole? Role { get; set; }
+
+    public bool? IsActive { get; set; }
+}
+
+public class UpdateUserRequest
+{
+    public string? Email { get; set; }
+
+    public string FullName { get; set; } = string.Empty;
+
+    public string? MobileNumber { get; set; }
+
+    public UserRole Role { get; set; }
+}

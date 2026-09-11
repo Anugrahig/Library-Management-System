@@ -17,6 +17,38 @@ public sealed class EfUserRepository(LibraryDbContext context) : IUserRepository
     public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         context.Users.SingleOrDefaultAsync(user => user.Email == email, cancellationToken);
 
+    public async Task<IReadOnlyList<User>> SearchAsync(
+        UserRole? role,
+        bool? isActive,
+        string? searchTerm,
+        CancellationToken cancellationToken = default)
+    {
+        var query = context.Users.AsNoTracking().AsQueryable();
+
+        if (role.HasValue)
+        {
+            query = query.Where(user => user.Role == role.Value);
+        }
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(user => user.IsActive == isActive.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = $"%{searchTerm.Trim()}%";
+            query = query.Where(user =>
+                EF.Functions.Like(user.Email, term) ||
+                EF.Functions.Like(user.FullName, term));
+        }
+
+        return await query.OrderBy(user => user.FullName).ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountActiveAdminsAsync(CancellationToken cancellationToken = default) =>
+        context.Users.CountAsync(user => user.Role == UserRole.Admin && user.IsActive, cancellationToken);
+
     public Task AddAsync(User user, CancellationToken cancellationToken = default) =>
         context.Users.AddAsync(user, cancellationToken).AsTask();
 }

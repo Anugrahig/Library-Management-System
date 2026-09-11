@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using FluentValidation;
 using LibraryManagement.API;
 using LibraryManagement.API.Security;
+using LibraryManagement.API.Workers;
 using LibraryManagement.Application.Common.Exceptions;
 using LibraryManagement.Application.Common.Security;
 using LibraryManagement.Application;
@@ -76,6 +77,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddHostedService<ReservationExpirationWorker>();
 
 var app = builder.Build();
 

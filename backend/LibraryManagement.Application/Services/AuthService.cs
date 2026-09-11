@@ -30,6 +30,7 @@ public class AuthService(
         }
 
         user.LastLoginAt = DateTime.UtcNow;
+        await unitOfWork.SaveChangesAsync(cancellationToken);
         var token = tokenService.CreateToken(user);
 
         return new AuthResponse

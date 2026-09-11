@@ -11,17 +11,18 @@ namespace LibraryManagement.Application.Services;
 public class ReservationService(
     IBookRepository books,
     IMemberRepository members,
+    IUserRepository users,
     IReservationRepository reservations,
     IUnitOfWork unitOfWork,
     IValidator<CreateReservationRequest> validator) : IReservationService
 {
-    public async Task<ReservationDto> CreateAsync(CreateReservationRequest request, CancellationToken cancellationToken = default)
+    public async Task<ReservationDto> CreateAsync(int userId, CreateReservationRequest request, CancellationToken cancellationToken = default)
     {
         await validator.ValidateAndThrowAsync(request, cancellationToken);
 
         var book = await books.GetByIdAsync(request.BookId, cancellationToken)
             ?? throw new NotFoundException("The book was not found.");
-        var member = await members.GetByIdAsync(request.MemberId, cancellationToken)
+        var member = await members.GetByUserIdAsync(userId, cancellationToken)
             ?? throw new NotFoundException("The member was not found.");
 
         if (!book.IsActive)
@@ -55,11 +56,11 @@ public class ReservationService(
         return Map(reservation);
     }
 
-    public Task<ReservationDto> CancelAsync(ReservationActionRequest request, CancellationToken cancellationToken = default)
-        => ChangeStatusAsync(request.ReservationId, ReservationStatus.Cancelled, cancellationToken);
+    public Task<ReservationDto> CancelAsync(int userId, ReservationActionRequest request, CancellationToken cancellationToken = default)
+        => ChangeStatusAsync(request.ReservationId, ReservationStatus.Cancelled, userId, cancellationToken);
 
     public Task<ReservationDto> FulfillAsync(ReservationActionRequest request, CancellationToken cancellationToken = default)
-        => ChangeStatusAsync(request.ReservationId, ReservationStatus.Fulfilled, cancellationToken);
+        => ChangeStatusAsync(request.ReservationId, ReservationStatus.Fulfilled, null, cancellationToken);
 
     public async Task<int> ExpirePendingAsync(DateTime utcNow, CancellationToken cancellationToken = default)
     {
@@ -78,10 +79,23 @@ public class ReservationService(
         return expiredReservations.Count;
     }
 
-    private async Task<ReservationDto> ChangeStatusAsync(int reservationId, ReservationStatus status, CancellationToken cancellationToken)
+    private async Task<ReservationDto> ChangeStatusAsync(int reservationId, ReservationStatus status, int? userId, CancellationToken cancellationToken)
     {
         var reservation = await reservations.GetByIdAsync(reservationId, cancellationToken)
             ?? throw new NotFoundException("The reservation was not found.");
+
+        if (userId.HasValue)
+        {
+            var member = await members.GetByIdAsync(reservation.MemberId, cancellationToken)
+                ?? throw new NotFoundException("The member was not found.");
+            var user = await users.GetByIdAsync(userId.Value, cancellationToken)
+                ?? throw new NotFoundException("The user was not found.");
+
+            if (user.Role is not (Domain.Enums.UserRole.Admin or Domain.Enums.UserRole.Librarian) && member.UserId != userId.Value)
+            {
+                throw new BusinessRuleException("You cannot cancel another member's reservation.");
+            }
+        }
 
         if (reservation.Status != ReservationStatus.Pending)
         {

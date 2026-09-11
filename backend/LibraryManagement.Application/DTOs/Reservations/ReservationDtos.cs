@@ -3,8 +3,6 @@ namespace LibraryManagement.Application.DTOs.Reservations;
 public class CreateReservationRequest
 {
     public int BookId { get; set; }
-
-    public int MemberId { get; set; }
 }
 
 public class ReservationActionRequest
