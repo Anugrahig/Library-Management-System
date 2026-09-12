@@ -1,28 +1,92 @@
-# This workflow will build a .NET project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
-
-name: .NET
-
+name: CI - Library Management System
+ 
+# Triggers: run on every push/PR to main and develop branches
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ "main" ]
-
+    branches: [ main, develop ]
+  workflow_dispatch: # allows manual trigger from the Actions tab
+ 
+env:
+  DOTNET_VERSION: '8.0.x'
+  NODE_VERSION: '20.x'
+  BACKEND_PROJECT_DIR: backend
+  FRONTEND_PROJECT_DIR: frontend
+ 
 jobs:
-  build:
-
+  # ---------------------------------------------------------------------
+  # Backend: build, restore, and run .NET tests
+  # ---------------------------------------------------------------------
+  backend-build-test:
+    name: Backend (.NET) Build & Test
     runs-on: ubuntu-latest
-
+ 
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 9.0.0
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      run: dotnet build --no-restore
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
+      - name: Checkout repository
+        uses: actions/checkout@v4
+ 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+ 
+      - name: Restore dependencies
+        run: dotnet restore
+        working-directory: ${{ env.BACKEND_PROJECT_DIR }}
+ 
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+        working-directory: ${{ env.BACKEND_PROJECT_DIR }}
+ 
+      - name: Run tests
+        run: dotnet test --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
+        working-directory: ${{ env.BACKEND_PROJECT_DIR }}
+ 
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: ${{ env.BACKEND_PROJECT_DIR }}/**/test-results.trx
+ 
+  # ---------------------------------------------------------------------
+  # Frontend: install, lint, test, and build the Angular app
+  # ---------------------------------------------------------------------
+  frontend-build-test:
+    name: Frontend (Angular) Build & Test
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+ 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.FRONTEND_PROJECT_DIR }}/package-lock.json
+ 
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ${{ env.FRONTEND_PROJECT_DIR }}
+ 
+      - name: Lint
+        run: npm run lint --if-present
+        working-directory: ${{ env.FRONTEND_PROJECT_DIR }}
+ 
+      - name: Run unit tests (headless)
+        run: npm test -- --watch=false --browsers=ChromeHeadless
+        working-directory: ${{ env.FRONTEND_PROJECT_DIR }}
+ 
+      - name: Build (production)
+        run: npm run build -- --configuration production
+        working-directory: ${{ env.FRONTEND_PROJECT_DIR }}
+ 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: ${{ env.FRONTEND_PROJECT_DIR }}/dist/**
+ 
